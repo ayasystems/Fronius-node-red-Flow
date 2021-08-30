@@ -1,0 +1,955 @@
+[
+    {
+        "id": "83561e6d9d8e72f0",
+        "type": "tab",
+        "label": "FroniusModBus",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "569bab2e.273894",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Leer AC",
+        "info": "https://discourse.nodered.org/t/help-on-error-on-modbus-write-to-fronius-primo-501/33913",
+        "x": 160,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "895e085b.1d11e8",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "",
+        "func": "var leido = msg.payload;\n\nmsg.payload = {};\n\nmsg.payload.AC_A = Number((leido.AC_A*Math.pow(10,leido.AC_A_SF)).toFixed(1));\n\nmsg.payload.AC_V = Number((leido.AC_V*Math.pow(10,leido.AC_V_SF)).toFixed(1));\n\nmsg.payload.AC_W = Number((leido.AC_W*Math.pow(10,leido.AC_W_SF)).toFixed(1));\n\nmsg.payload.AC_Hz = Number((leido.AC_Hz*Math.pow(10,leido.AC_Hz_SF)).toFixed(2));\n\nmsg.parts = msg.payload;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 200,
+        "wires": [
+            [
+                "fdf51460.4915c8",
+                "d5c7cc8f.24a6f"
+            ]
+        ]
+    },
+    {
+        "id": "7a96a0a6.c0fd4",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Envíar OPState",
+        "func": "var leido = msg.payload;\nvar idx = 542;\nvar currentOpState = global.get(\"FroniusOpState\")||99;\nmsg.payload = {}; \n\nglobal.set(\"FroniusOpState\",leido.OpState);\n\nvar level = leido.OpState * 10;\n\nmsg.payload.command    = \"switchlight\";\nmsg.payload.idx        = idx;\nmsg.payload.switchcmd  = \"Set Level\";\nmsg.payload.level      = 40;\n\nif (leido.OpState!=currentOpState){\nreturn msg;\n}else{\n    return false;\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "// Code added here will be run once\n// whenever the node is started.\nglobal.set(\"FroniusOpState\",99);",
+        "finalize": "// Code added here will be run when the\n// node is being stopped or re-deployed.\nglobal.set(\"FroniusOpState\",99);",
+        "libs": [],
+        "x": 610,
+        "y": 260,
+        "wires": [
+            [
+                "a6148e8.666dd7"
+            ]
+        ]
+    },
+    {
+        "id": "2c9738a1.401108",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Enviar producción a domoticz",
+        "func": "//Inidicar el IDx de Domoticz. Tiene que ser un contador electric (instant+counter)\nvar idx  = 21;\n\nvar fvwatts = msg.payload.AC_W;\n \n\nglobal.set(\"fvwatts\",fvwatts)\n \n \nvar acumulado = global.get(\"produccionWh\") || 0;\n    acumulado = acumulado.toString();\n\n \n    \n    //{\"idx\":236,\"nvalue\":0,\"svalue\":\"1;276293.9\",\"Battery\":200,\"RSSI\":10}\n    var svalue = fvwatts + \";\"+acumulado;\n\n    msg.payload = {};\n    msg.payload.idx = idx;\n    msg.payload.svalue = svalue;\n    msg.payload.nvalue =  0;\n    \n     \n    return msg;\n ",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 930,
+        "y": 160,
+        "wires": [
+            [
+                "841ee3f2f0dfdfb2"
+            ]
+        ]
+    },
+    {
+        "id": "d5c7cc8f.24a6f",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Enviar producción AC a grafana",
+        "func": "var fvwatts = msg.payload.AC_W;\nvar AC_Hz =  msg.payload.AC_Hz;\n\n    msg.payload = {};\n    msg.payload.AC_W = fvwatts;\n    msg.payload.AC_Hz = AC_Hz;\n     \n    return msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 890,
+        "y": 280,
+        "wires": [
+            [
+                "56368a04ec777c88"
+            ]
+        ]
+    },
+    {
+        "id": "96b0d902.3466f8",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Enviar DC a Grafana",
+        "func": "var leido = msg.payload;\nvar enivarACFroniusPrev = flow.get(\"enivarACFronius\");\nenivarACFronius = true;\nmsg.payload = {};\n\n\n //Hay veces que se le va la pinza y devuelve este valor, le pasa cuando no hay suficiente tensión\n //en placas y ya no genera\nif(leido.DC_V_1==65535){\n    leido.DC_V_1=0;\n}\nif(leido.DC_A_1==65535){\n    leido.DC_A_1=0;\n}\nif(leido.DC_W_1==65535){\n    leido.DC_W_1=0;\n}\nif(leido.DC_V_2==65535){\n    leido.DC_V_2=0;\n}\nif(leido.DC_A_2==65535){\n    leido.DC_A_2=0;\n}\nif(leido.DC_W_2==65535){\n    leido.DC_W_2=0;\n}\n\nmsg.payload.DC_A_1 = Number((leido.DC_A_1*Math.pow(10,leido.DCA_SF)).toFixed(1));\nmsg.payload.DC_V_1 = Number((leido.DC_V_1*Math.pow(10,leido.DCV_SF)).toFixed(1));\nmsg.payload.DC_W_1 = Number((leido.DC_W_1*Math.pow(10,leido.DCW_SF)).toFixed(1));\n\nmsg.payload.DC_A_2 = Number((leido.DC_A_2*Math.pow(10,leido.DCA_SF)).toFixed(1));\nmsg.payload.DC_V_2 = Number((leido.DC_V_2*Math.pow(10,leido.DCV_SF)).toFixed(1));\nmsg.payload.DC_W_2 = Number((leido.DC_W_2*Math.pow(10,leido.DCW_SF)).toFixed(1));\n\nif ( (msg.payload.DC_W_1==0) && (msg.payload.DC_W_2==0) ){\n    enivarACFronius = false;\n}\n\n\n\nmsg.payload.DC_W_TOTAL = Number(msg.payload.DC_W_1 + msg.payload.DC_W_2);\nflow.set(\"DC_W\",msg.payload.DC_W_TOTAL);\n\nglobal.set(\"FroniusDC\",msg.payload);\nflow.set(\"enivarACFronius\",enivarACFronius);\n\nif((!enivarACFroniusPrev)&&(!enivarACFronius)){\n    //node.warn(\"A\");\n    return false;\n}else{\n    var ac_w = global.get(\"fvwatts\")\n    \n    var dc_w = msg.payload.DC_W_TOTAL;\n    if ( (dc_w>1) && (ac_w>1) ) {\n    var eficiencia = 100-(((dc_w - ac_w)/dc_w)*100);\n    msg.payload.eficiencia = eficiencia;\n    }\n     \n    //node.warn(\"B\");\n    //node.warn(enivarACFroniusPrev);\n    \n    \n    return msg;\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 810,
+        "y": 380,
+        "wires": [
+            [
+                "56368a04ec777c88"
+            ]
+        ]
+    },
+    {
+        "id": "87ed8792.3627a8",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Exportar acumulado generación AC",
+        "func": "\n\n\nglobal.set(\"produccionWh\",msg.payload.P_ACWh);\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 830,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a20285be.646c38",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Leer DC",
+        "info": "https://discourse.nodered.org/t/help-on-error-on-modbus-write-to-fronius-primo-501/33913",
+        "x": 290,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "5537cdb2.0ba6e4",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Leer meter",
+        "info": " El ID es el 240 (en el caso de un solo medidor). Los registros a leer son el 40088 \"AC Power value\", y su Scale Factor en el 40092.",
+        "x": 170,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "eadf71da7e057d27",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Conversión",
+        "func": "var leido = msg.payload;\n\nmsg.payload = {};\n\n\n\nmsg.payload.HZ = Number((leido.Hz*Math.pow(10,leido.Hz_SF)).toFixed(2));\n\nmsg.payload.watts = Number((leido.W*Math.pow(10,leido.W_SF)).toFixed(2));\n\n\nmsg.payload.importado = Number((leido.IMPORT_WH*Math.pow(10,leido.W_SF)).toFixed(2));\n\nmsg.payload.exportado = Number((leido.EXPORT_WH*Math.pow(10,leido.W_SF)).toFixed(2));\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 560,
+        "wires": [
+            [
+                "788c3b9bf2ce6d92",
+                "3e0355cd5e557f7d"
+            ]
+        ]
+    },
+    {
+        "id": "788c3b9bf2ce6d92",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Enviar importado a domoticz",
+        "func": "var leido = msg.payload;\n\nmsg.payload = {};\n//Inidicar el IDx de Domoticz. Tiene que ser un contador electric (instant+counter)\nvar watts = 0;\n\n\nvar idx  = 22;\n\n    if(leido.watts>0){\n        watts = leido.watts;\n    }\n    //{\"idx\":236,\"nvalue\":0,\"svalue\":\"1;276293.9\",\"Battery\":200,\"RSSI\":10}\n    var svalue = watts.toString() + \";\"+leido.importado.toString();\n\n    msg.payload = {};\n    msg.payload.idx = idx;\n    msg.payload.svalue = svalue;\n    msg.payload.nvalue =  0;\n    \n     \n    return msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 990,
+        "y": 620,
+        "wires": [
+            [
+                "841ee3f2f0dfdfb2"
+            ]
+        ]
+    },
+    {
+        "id": "3e0355cd5e557f7d",
+        "type": "function",
+        "z": "83561e6d9d8e72f0",
+        "name": "Enviar exportado a domoticz",
+        "func": "var leido = msg.payload;\n\nmsg.payload = {};\n//Inidicar el IDx de Domoticz. Tiene que ser un contador electric (instant+counter)\nvar watts = 0;\n\n\nvar idx  = 23;\n\n    if(leido.watts<0){\n        watts = leido.watts * -1;\n    }\n    //{\"idx\":236,\"nvalue\":0,\"svalue\":\"1;276293.9\",\"Battery\":200,\"RSSI\":10}\n    var svalue = watts.toString() + \";\"+leido.exportado.toString();\n\n    msg.payload = {};\n    msg.payload.idx = idx;\n    msg.payload.svalue = svalue;\n    msg.payload.nvalue =  0;\n    \n     \n    return msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 980,
+        "y": 720,
+        "wires": [
+            [
+                "841ee3f2f0dfdfb2"
+            ]
+        ]
+    },
+    {
+        "id": "a6148e8.666dd7",
+        "type": "debug",
+        "z": "83561e6d9d8e72f0",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 810,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "6e82bfc449de321d",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Requisitos",
+        "info": "Es necesario instalar los siguientes nodos de node-red\n\nnode-red-contrib-modbus\nnode-red-contrib-moment\nnode-red-contrib-buffer-parser\nnode-red-contrib-influxdb\n\nUna vez instalados crearemos 3 Energy meter en domoticz (instant+counter)\n\nProducción\nImportado\nExportado\n\nFronius debe estar configurado para modbus INT+SF",
+        "x": 140,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "b422fedb.dcbdb",
+        "type": "modbus-read",
+        "z": "83561e6d9d8e72f0",
+        "name": "FroniusInverter_AC",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "unitid": "1",
+        "dataType": "HoldingRegister",
+        "adr": "40071",
+        "quantity": "40",
+        "rate": "1",
+        "rateUnit": "s",
+        "delayOnStart": true,
+        "startDelayTime": "2",
+        "server": "cc027ad1.3d2458",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 200,
+        "y": 200,
+        "wires": [
+            [],
+            [
+                "47571654.1ecc88"
+            ]
+        ]
+    },
+    {
+        "id": "be36600f.86cde",
+        "type": "modbus-read",
+        "z": "83561e6d9d8e72f0",
+        "name": "FroniusInverter_DC",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "unitid": "1",
+        "dataType": "HoldingRegister",
+        "adr": "40255",
+        "quantity": "40",
+        "rate": "1",
+        "rateUnit": "s",
+        "delayOnStart": false,
+        "startDelayTime": "",
+        "server": "cc027ad1.3d2458",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 320,
+        "y": 360,
+        "wires": [
+            [],
+            [
+                "722ba4ed.9b6c1c"
+            ]
+        ]
+    },
+    {
+        "id": "5f145bf3.ae85d4",
+        "type": "modbus-read",
+        "z": "83561e6d9d8e72f0",
+        "name": "FroniusACWh",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "unitid": "1",
+        "dataType": "HoldingRegister",
+        "adr": "509",
+        "quantity": "4",
+        "rate": "30",
+        "rateUnit": "s",
+        "delayOnStart": false,
+        "startDelayTime": "",
+        "server": "cc027ad1.3d2458",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 300,
+        "y": 480,
+        "wires": [
+            [],
+            [
+                "84013164.1f334"
+            ]
+        ]
+    },
+    {
+        "id": "99143551.8bea58",
+        "type": "modbus-read",
+        "z": "83561e6d9d8e72f0",
+        "name": "FroniusMeter",
+        "topic": "",
+        "showStatusActivities": false,
+        "logIOActivities": false,
+        "showErrors": false,
+        "unitid": "240",
+        "dataType": "HoldingRegister",
+        "adr": "40085",
+        "quantity": "84",
+        "rate": "5",
+        "rateUnit": "s",
+        "delayOnStart": false,
+        "startDelayTime": "",
+        "server": "cc027ad1.3d2458",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 300,
+        "y": 560,
+        "wires": [
+            [],
+            [
+                "31cc51c2.7461be"
+            ]
+        ]
+    },
+    {
+        "id": "fdf51460.4915c8",
+        "type": "moment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Set time",
+        "topic": "",
+        "input": "",
+        "inputType": "date",
+        "inTz": "Europe/Madrid",
+        "adjAmount": 0,
+        "adjType": "days",
+        "adjDir": "add",
+        "format": "HH:mm",
+        "locale": "es-ES",
+        "output": "payload.time",
+        "outputType": "msg",
+        "outTz": "Europe/Madrid",
+        "x": 670,
+        "y": 140,
+        "wires": [
+            [
+                "2c9738a1.401108"
+            ]
+        ]
+    },
+    {
+        "id": "47571654.1ecc88",
+        "type": "buffer-parser",
+        "z": "83561e6d9d8e72f0",
+        "name": "Buffer AC",
+        "data": "payload.buffer",
+        "dataType": "msg",
+        "specification": "spec",
+        "specificationType": "ui",
+        "items": [
+            {
+                "type": "int16be",
+                "name": "AC_A",
+                "offset": 0,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_A_SF",
+                "offset": 8,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_V",
+                "offset": 16,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_V_SF",
+                "offset": 22,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_W",
+                "offset": 24,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_W_SF",
+                "offset": 26,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_Wh",
+                "offset": 44,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_Wh_SF",
+                "offset": 48,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "AC_Hz",
+                "offset": 28,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "AC_Hz_SF",
+                "offset": 30,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "OpState",
+                "offset": 72,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "VDOpState",
+                "offset": 74,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            }
+        ],
+        "swap1": "",
+        "swap2": "",
+        "swap3": "",
+        "swap1Type": "swap",
+        "swap2Type": "swap",
+        "swap3Type": "swap",
+        "msgProperty": "payload",
+        "msgPropertyType": "str",
+        "resultType": "keyvalue",
+        "resultTypeType": "output",
+        "multipleResult": false,
+        "fanOutMultipleResult": false,
+        "setTopic": true,
+        "outputs": 1,
+        "x": 410,
+        "y": 200,
+        "wires": [
+            [
+                "895e085b.1d11e8",
+                "7a96a0a6.c0fd4"
+            ]
+        ]
+    },
+    {
+        "id": "722ba4ed.9b6c1c",
+        "type": "buffer-parser",
+        "z": "83561e6d9d8e72f0",
+        "name": "Buffer DC",
+        "data": "payload.buffer",
+        "dataType": "msg",
+        "specification": "spec",
+        "specificationType": "ui",
+        "items": [
+            {
+                "type": "int16be",
+                "name": "DCA_SF",
+                "offset": 0,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "DCV_SF",
+                "offset": 2,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "DCW_SF",
+                "offset": 4,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "DCWH_SF",
+                "offset": 6,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_A_1",
+                "offset": 34,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_V_1",
+                "offset": 36,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_W_1",
+                "offset": 38,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_A_2",
+                "offset": 74,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_V_2",
+                "offset": 76,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint16be",
+                "name": "DC_W_2",
+                "offset": 78,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            }
+        ],
+        "swap1": "",
+        "swap2": "",
+        "swap3": "",
+        "swap1Type": "swap",
+        "swap2Type": "swap",
+        "swap3Type": "swap",
+        "msgProperty": "payload",
+        "msgPropertyType": "str",
+        "resultType": "keyvalue",
+        "resultTypeType": "output",
+        "multipleResult": false,
+        "fanOutMultipleResult": false,
+        "setTopic": true,
+        "outputs": 1,
+        "x": 550,
+        "y": 360,
+        "wires": [
+            [
+                "96b0d902.3466f8"
+            ]
+        ]
+    },
+    {
+        "id": "84013164.1f334",
+        "type": "buffer-parser",
+        "z": "83561e6d9d8e72f0",
+        "name": "Buffer ACWh",
+        "data": "payload.buffer",
+        "dataType": "msg",
+        "specification": "spec",
+        "specificationType": "ui",
+        "items": [
+            {
+                "type": "biguint64be",
+                "name": "P_ACWh",
+                "offset": 0,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            }
+        ],
+        "swap1": "",
+        "swap2": "",
+        "swap3": "",
+        "swap1Type": "swap",
+        "swap2Type": "swap",
+        "swap3Type": "swap",
+        "msgProperty": "payload",
+        "msgPropertyType": "str",
+        "resultType": "keyvalue",
+        "resultTypeType": "output",
+        "multipleResult": false,
+        "fanOutMultipleResult": false,
+        "setTopic": true,
+        "outputs": 1,
+        "x": 540,
+        "y": 480,
+        "wires": [
+            [
+                "87ed8792.3627a8"
+            ]
+        ]
+    },
+    {
+        "id": "31cc51c2.7461be",
+        "type": "buffer-parser",
+        "z": "83561e6d9d8e72f0",
+        "name": "Buffer Meter",
+        "data": "payload.buffer",
+        "dataType": "msg",
+        "specification": "spec",
+        "specificationType": "ui",
+        "items": [
+            {
+                "type": "int16be",
+                "name": "Hz",
+                "offset": 0,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "Hz_SF",
+                "offset": 2,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "W",
+                "offset": 4,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "W_A",
+                "offset": 6,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "W_B",
+                "offset": 8,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "W_C",
+                "offset": 10,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "W_SF",
+                "offset": 12,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint32be",
+                "name": "EXPORT_WH",
+                "offset": 44,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "uint32be",
+                "name": "IMPORT_WH",
+                "offset": 60,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            },
+            {
+                "type": "int16be",
+                "name": "_WH_SF",
+                "offset": 76,
+                "length": 1,
+                "offsetbit": 0,
+                "scale": "1",
+                "mask": ""
+            }
+        ],
+        "swap1": "",
+        "swap2": "",
+        "swap3": "",
+        "swap1Type": "swap",
+        "swap2Type": "swap",
+        "swap3Type": "swap",
+        "msgProperty": "payload",
+        "msgPropertyType": "str",
+        "resultType": "keyvalue",
+        "resultTypeType": "output",
+        "multipleResult": false,
+        "fanOutMultipleResult": false,
+        "setTopic": true,
+        "outputs": 1,
+        "x": 560,
+        "y": 560,
+        "wires": [
+            [
+                "eadf71da7e057d27"
+            ]
+        ]
+    },
+    {
+        "id": "9d1b2b584697e1ac",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Poner IDX Producción",
+        "info": "",
+        "x": 900,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "841ee3f2f0dfdfb2",
+        "type": "mqtt out",
+        "z": "83561e6d9d8e72f0",
+        "name": "",
+        "topic": "domoticz/in",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "c8c2eda55ab1f380",
+        "x": 1230,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "56368a04ec777c88",
+        "type": "influxdb out",
+        "z": "83561e6d9d8e72f0",
+        "influxdb": "7fa8f13b49c2a7ae",
+        "name": "Enviar SOLAR",
+        "measurement": "SOLAR",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "organisation",
+        "bucket": "bucket",
+        "x": 1240,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "271be8c3f403717a",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Más info",
+        "info": "https://t.me/domoticzalospain",
+        "x": 330,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "89d7ce9f5340aa2d",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Poner IDX Importado",
+        "info": "",
+        "x": 960,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "c624e61b2bf2af4c",
+        "type": "comment",
+        "z": "83561e6d9d8e72f0",
+        "name": "Poner IDX Exportado",
+        "info": "",
+        "x": 950,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "cc027ad1.3d2458",
+        "type": "modbus-client",
+        "name": "FroniusInverter",
+        "clienttype": "tcp",
+        "bufferCommands": true,
+        "stateLogEnabled": false,
+        "queueLogEnabled": false,
+        "tcpHost": "192.168.3.8",
+        "tcpPort": "502",
+        "tcpType": "DEFAULT",
+        "serialPort": "/dev/ttyUSB",
+        "serialType": "RTU-BUFFERD",
+        "serialBaudrate": "9600",
+        "serialDatabits": "8",
+        "serialStopbits": "1",
+        "serialParity": "none",
+        "serialConnectionDelay": "100",
+        "unit_id": 1,
+        "commandDelay": 1,
+        "clientTimeout": 1000,
+        "reconnectOnTimeout": true,
+        "reconnectTimeout": 2000,
+        "parallelUnitIdsAllowed": true
+    },
+    {
+        "id": "c8c2eda55ab1f380",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    },
+    {
+        "id": "7fa8f13b49c2a7ae",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": "8086",
+        "protocol": "http",
+        "database": "DOMOTUTO",
+        "name": "InfluxDB",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "1.x",
+        "url": "http://localhost:8086",
+        "rejectUnauthorized": true
+    }
+]
