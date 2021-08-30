@@ -9,23 +9,18 @@ Tener un broquer mqtt, node-red instalado y funcionando, domoticz y opcionalment
 # Requisitos en node-red
 Es necesario instalar los siguientes nodos de node-red
 
-node-red-contrib-modbus
-
-node-red-contrib-moment
-
-node-red-contrib-buffer-parser
-
-node-red-contrib-influxdb
+- node-red-contrib-modbus
+- node-red-contrib-moment
+- node-red-contrib-buffer-parser
+- node-red-contrib-influxdb
 
 
 # Requisitos domoticz
 Necesitaremos tener 3 energy meter (counter + instant) creados en domoticz [dummy/virtual]
 
-Producción
-
-Importado
-
-Exportado
+- Producción
+- Importado
+- Exportado
 
 
 # Requisitos inversor
