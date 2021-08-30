@@ -27,3 +27,7 @@ Configurar modbus como INT+SF
 
 ![Modbus Setup](https://github.com/ayasystems/Fronius-node-red-Flow/blob/main/modbus_options.png)
 
+
+
+
+
